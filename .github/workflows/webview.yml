@@ -27,16 +27,18 @@ jobs:
           "
           cordova platform add ios
 
-      - name: Compiler l'application (.app) avec Xcode
+      - name: Compiler l'application (.app) avec Xcode Force
         run: |
           cd goku-app/platforms/ios
           PROJECT_NAME=$(ls -d *.xcodeproj | head -n 1)
           SCHEME_NAME=${PROJECT_NAME%.xcodeproj}
           
+          # On force la sortie dans un dossier nommé 'build_output'
           xcodebuild -project "$PROJECT_NAME" \
                      -scheme "$SCHEME_NAME" \
                      -configuration Release \
                      -sdk iphoneos \
+                     -derivedDataPath "build_output" \
                      CODE_SIGNING_ALLOWED=NO \
                      CODE_SIGNING_REQUIRED=NO \
                      clean build
@@ -45,14 +47,13 @@ jobs:
         run: |
           mkdir -p ${{ github.workspace }}/ipa/Payload
           
-          # RECHERCHE GLOBALE DU .APP
-          # On cherche dans tout le dossier goku-app
-          APP_PATH=$(find ${{ github.workspace }}/goku-app/platforms/ios -name "*.app" -type d | grep -v "Pods" | head -n 1)
+          # On cherche le .app dans notre dossier forcé 'build_output'
+          APP_PATH=$(find goku-app/platforms/ios/build_output -name "*.app" -type d | head -n 1)
           
           echo "Application trouvée ici : $APP_PATH"
           
           if [ -z "$APP_PATH" ]; then
-            echo "ERREUR : Impossible de trouver le fichier .app"
+            echo "ERREUR : Le build a échoué à produire un .app"
             exit 1
           fi
           
