@@ -18,24 +18,58 @@ jobs:
         run: |
           cordova create goku-app com.gokusensi.shop "GokuSensei"
           cd goku-app
+          
+          # Création de la page Hors-ligne personnalisée
+          cat <<EOF > www/offline.html
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <style>
+                  body { background: #050505; color: white; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+                  .card { padding: 30px; border-radius: 25px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); margin: 20px; }
+                  h1 { color: #00d1ff; margin-bottom: 10px; }
+                  p { color: #888; margin-bottom: 25px; }
+                  .btn { background: white; color: black; padding: 12px 25px; border-radius: 15px; text-decoration: none; font-weight: bold; }
+              </style>
+          </head>
+          <body>
+              <div class="card">
+                  <h1>Oups ! Pas de connexion</h1>
+                  <p>Il semble que vous soyez hors-ligne.<br>Vérifiez votre connexion internet pour accéder à GokuSensei.</p>
+                  <a href="index.html" class="btn">Réessayer</a>
+              </div>
+          </body>
+          </html>
+          EOF
+
+          # Configuration du comportement de l'App
           node -e "
             const fs = require('fs');
             let config = fs.readFileSync('config.xml', 'utf8');
+            
+            // On définit la page par défaut vers l'URL distante
             config = config.replace('src=\"index.html\"', 'src=\"https://gokusensi.com\"');
-            config = config.replace('</widget>', '  <allow-navigation href=\"https://gokusensi.com/*\" />\n</widget>');
+            
+            // On injecte la gestion d'erreur pour rediriger vers offline.html si le chargement échoue
+            const errorConfig = '  <allow-navigation href=\"https://gokusensi.com/*\" />\n' +
+                                '  <preference name=\"ErrorUrl\" value=\"offline.html\"/>\n';
+            config = config.replace('</widget>', errorConfig + '</widget>');
+            
             fs.writeFileSync('config.xml', config);
           "
+          
           cordova platform add ios
 
       - name: Compiler l'application (.app) avec Xcode Force
         run: |
           cd goku-app/platforms/ios
-          PROJECT_NAME=$(ls -d *.xcodeproj | head -n 1)
-          SCHEME_NAME=${PROJECT_NAME%.xcodeproj}
+          PROJECT_NAME=\$(ls -d *.xcodeproj | head -n 1)
+          SCHEME_NAME=\${PROJECT_NAME%.xcodeproj}
           
-          # On force la sortie dans un dossier nommé 'build_output'
-          xcodebuild -project "$PROJECT_NAME" \
-                     -scheme "$SCHEME_NAME" \
+          xcodebuild -project "\$PROJECT_NAME" \
+                     -scheme "\$SCHEME_NAME" \
                      -configuration Release \
                      -sdk iphoneos \
                      -derivedDataPath "build_output" \
@@ -45,24 +79,14 @@ jobs:
 
       - name: Structurer et empaqueter en fichier .IPA
         run: |
-          mkdir -p ${{ github.workspace }}/ipa/Payload
-          
-          # On cherche le .app dans notre dossier forcé 'build_output'
-          APP_PATH=$(find goku-app/platforms/ios/build_output -name "*.app" -type d | head -n 1)
-          
-          echo "Application trouvée ici : $APP_PATH"
-          
-          if [ -z "$APP_PATH" ]; then
-            echo "ERREUR : Le build a échoué à produire un .app"
-            exit 1
-          fi
-          
-          cp -R "$APP_PATH" ${{ github.workspace }}/ipa/Payload/
-          cd ${{ github.workspace }}/ipa
-          zip -r ${{ github.workspace }}/GokuSensiz.ipa .
+          mkdir -p \${{ github.workspace }}/ipa/Payload
+          APP_PATH=\$(find goku-app/platforms/ios/build_output -name "*.app" -type d | head -n 1)
+          cp -R "\$APP_PATH" \${{ github.workspace }}/ipa/Payload/
+          cd \${{ github.workspace }}/ipa
+          zip -r \${{ github.workspace }}/GokuSensiz.ipa .
 
       - name: Mettre à disposition le fichier IPA
         uses: actions/upload-artifact@v4
         with:
           name: GokuSensiz-App-iOS
-          path: ${{ github.workspace }}/GokuSensiz.ipa
+          path: \${{ github.workspace }}/GokuSensiz.ipa
