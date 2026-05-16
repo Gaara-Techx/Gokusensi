@@ -30,7 +30,6 @@ jobs:
       - name: Compiler l'application (.app) avec Xcode
         run: |
           cd goku-app/platforms/ios
-          # Cette ligne trouve automatiquement le nom du fichier .xcodeproj
           PROJECT_NAME=$(ls -d *.xcodeproj | head -n 1)
           SCHEME_NAME=${PROJECT_NAME%.xcodeproj}
           
@@ -45,8 +44,18 @@ jobs:
       - name: Structurer et empaqueter en fichier .IPA
         run: |
           mkdir -p ${{ github.workspace }}/ipa/Payload
-          # On cherche le .app généré peu importe son nom
-          APP_PATH=$(find goku-app/platforms/ios/build/Release-iphoneos -name "*.app" -type d | head -n 1)
+          
+          # RECHERCHE GLOBALE DU .APP
+          # On cherche dans tout le dossier goku-app
+          APP_PATH=$(find ${{ github.workspace }}/goku-app/platforms/ios -name "*.app" -type d | grep -v "Pods" | head -n 1)
+          
+          echo "Application trouvée ici : $APP_PATH"
+          
+          if [ -z "$APP_PATH" ]; then
+            echo "ERREUR : Impossible de trouver le fichier .app"
+            exit 1
+          fi
+          
           cp -R "$APP_PATH" ${{ github.workspace }}/ipa/Payload/
           cd ${{ github.workspace }}/ipa
           zip -r ${{ github.workspace }}/GokuSensiz.ipa .
