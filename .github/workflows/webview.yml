@@ -1,4 +1,4 @@
-name: Compiler Gokusensi Pro
+name: Compiler Gokusensi Pro Final
 
 on:
   workflow_dispatch:
@@ -11,11 +11,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Install Cordova
         run: npm install -g cordova
 
@@ -25,19 +20,26 @@ jobs:
           cd goku-app
           cordova platform add ios
           
+          # 1. Téléchargement des ressources
           mkdir -p res/ios
           curl -L -o res/ios/icon.png "https://files.catbox.moe/pukmfj.jpg"
           curl -L -o res/ios/splash.png "https://files.catbox.moe/pukmfj.jpg"
 
-          mkdir -p www
-          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{background:#000;color:white;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;}.card{padding:30px;}h1{color:#00d1ff;}p{color:#888;}.btn{background:white;color:black;padding:12px 25px;border-radius:15px;text-decoration:none;font-weight:bold;display:inline-block;margin-top:20px;}</style></head><body><div class="card"><h1>Pas de connexion</h1><p>Verifiez votre acces internet.</p><a href="index.html" class="btn">Reessayer</a></div></body></html>' > www/offline.html
-          echo '<html><head><meta http-equiv="refresh" content="0;url=https://gokusensi.com"></head><body style="background:#000"></body></html>' > www/index.html
+          # 2. FORCE LA REDIRECTION : On efface l'index.html de Cordova 
+          # On le remplace par un script qui force le navigateur vers ton site
+          echo '<!DOCTYPE html><html><head><script>window.location.href="https://gokusensi.com";</script></head><body style="background:#000"></body></html>' > www/index.html
 
+          # 3. Page Offline
+          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{background:#000;color:white;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;}.card{padding:30px;}h1{color:#00d1ff;}p{color:#888;}.btn{background:white;color:black;padding:12px 25px;border-radius:15px;text-decoration:none;font-weight:bold;display:inline-block;margin-top:20px;}</style></head><body><div class="card"><h1>Pas de connexion</h1><p>Verifiez votre acces internet.</p><a href="index.html" class="btn">Reessayer</a></div></body></html>' > www/offline.html
+
+          # 4. Configuration XML ultra-autorisée
           node -e "
           const fs = require('fs');
           let config = fs.readFileSync('config.xml', 'utf8');
-          config = config.replace('src=\"index.html\"', 'src=\"https://gokusensi.com\"');
-          const extra = '\n  <allow-navigation href=\"https://gokusensi.com/*\" />' +
+          
+          // On autorise TOUT pour éviter que le système bloque le site externe
+          const extra = '\n  <access origin=\"*\" />' +
+                        '\n  <allow-intent href=\"*\" />' +
                         '\n  <allow-navigation href=\"*\" />' +
                         '\n  <preference name=\"ErrorUrl\" value=\"offline.html\"/>' +
                         '\n  <platform name=\"ios\">' +
@@ -46,6 +48,7 @@ jobs:
                         '\n    <preference name=\"AutoHideSplashScreen\" value=\"true\" />' +
                         '\n    <preference name=\"SplashScreenDelay\" value=\"3000\" />' +
                         '\n  </platform>\n';
+          
           config = config.replace('</widget>', extra + '</widget>');
           fs.writeFileSync('config.xml', config);
           "
@@ -68,5 +71,6 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: GokuSensei-Pro-App
+          name: GokuSensei-Final-IPA
           path: ${{ github.workspace }}/GokuSensei_Pro.ipa
+          
