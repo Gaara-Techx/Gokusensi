@@ -1,0 +1,67 @@
+name: Compiler Gokusensi IPA
+
+on:
+  workflow_dispatch: # Permet de lancer le script manuellement en 1 clic
+
+jobs:
+  build:
+    runs-on: macos-latest # On utilise un serveur Mac de GitHub pour Xcode
+
+    steps:
+      - name: Récupérer le code du dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Node.js et Cordova
+        run: |
+          npm install -g cordova
+
+      - name: Créer le projet iOS Cordova
+        run: |
+          # 1. Création de l'espace projet
+          cordova create goku-app com.gokusensi.shop "GokuSensei"
+          cd goku-app
+          
+          # 2. Configuration pour rediriger directement vers ton site web
+          node -e "
+            const fs = require('fs');
+            let config = fs.readFileSync('config.xml', 'utf8');
+            // Change l'origine pour pointer sur ton site
+            config = config.replace('src=\"index.html\"', 'src=\"https://gokusensi.com\"');
+            // Autorise la navigation externe vers ton domaine
+            config = config.replace('</widget>', '  <allow-navigation href=\"https://gokusensi.com/*\" />\n</widget>');
+            fs.writeFileSync('config.xml', config);
+          "
+          
+          # 3. Ajouter la plateforme iOS
+          cordova platform add ios
+
+      - name: Compiler l'application (.app) avec Xcode
+        run: |
+          cd goku-app/platforms/ios
+          
+          # Compilation brute sans certificat (pour jailbreak / trollstore / sideload)
+          xcodebuild -project "GokuSensei.xcodeproj" \
+                     -scheme "GokuSensei" \
+                     -configuration Release \
+                     -sdk iphoneos \
+                     CODE_SIGNING_ALLOWED=NO \
+                     CODE_SIGNING_REQUIRED=NO \
+                     clean build
+
+      - name: Structurer et empaqueter en fichier .IPA
+        run: |
+          # Création de l'arborescence obligatoire pour iOS (Dossier Payload)
+          mkdir -p ${{ github.workspace }}/ipa/Payload
+          
+          # Copie de l'application compilée (.app) dans le Payload
+          cp -R goku-app/platforms/ios/build/Release-iphoneos/GokuSensei.app ${{ github.workspace }}/ipa/Payload/
+          
+          # Compression en fichier .ipa
+          cd ${{ github.workspace }}/ipa
+          zip -r ${{ github.workspace }}/GokuSensiz.ipa .
+
+      - name: Mettre à disposition le fichier IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: GokuSensiz-App-iOS
+          path: ${{ github.workspace }}/GokuSensiz.ipa
