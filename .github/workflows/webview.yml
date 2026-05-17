@@ -30,10 +30,10 @@ jobs:
         cd goku-app
         mkdir -p res/icon/ios
         curl -L "https://files.catbox.moe/pukmfj.jpg" -o res/icon/ios/icon.jpg
-        # Correction de la ligne 48 : Remplacement propre sans caractères parasites
+        # Correction du sed pour éviter le skip
         sed -i '' 's|</widget>|  <platform name="ios">\n    <icon src="res/icon/ios/icon.jpg" width="1024" height="1024" />\n  </platform>\n</widget>|' config.xml
 
-    - name: Injecter l'interface (Spinner + Offline + SW)
+    - name: Injecter l'interface (GokuSenseiz Styles)
       run: |
         cd goku-app/www
         
@@ -49,79 +49,34 @@ jobs:
         <style>
             :root { --bg: #030303; --accent: #ffffff; --z-color: #ff3333; }
             * { margin: 0; padding: 0; box-sizing: border-box; }
-            body {
-                background-color: var(--bg);
-                background-image: radial-gradient(circle at 50% 50%, #1a1a1a 0%, #030303 100%);
-                height: 100vh; display: flex; justify-content: center; align-items: center;
-                font-family: 'Outfit', sans-serif; overflow: hidden;
-            }
+            body { background-color: var(--bg); background-image: radial-gradient(circle at 50% 50%, #1a1a1a 0%, #030303 100%); height: 100vh; display: flex; justify-content: center; align-items: center; font-family: 'Outfit', sans-serif; overflow: hidden; }
             .wrapper { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; max-width: 600px; padding: 20px; }
             .title-js { display: flex; gap: 15px; }
-            .letter {
-                position: relative; font-size: 8.5vw; font-weight: 900; color: transparent;
-                -webkit-text-stroke: 1px rgba(255, 255, 255, 0.15); text-transform: uppercase; opacity: 0;
-            }
-            @media (min-width: 768px) { .letter { font-size: 4.5rem; } }
-            .letter::before {
-                content: attr(data-char); position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-                color: var(--accent); -webkit-text-stroke: 0px transparent; clip-path: inset(0 100% 0 0);
-            }
+            .letter { position: relative; font-size: 8.5vw; font-weight: 900; color: transparent; -webkit-text-stroke: 1px rgba(255, 255, 255, 0.15); text-transform: uppercase; display: inline-block; opacity: 0; }
+            .letter::before { content: attr(data-char); position: absolute; top: 0; left: 0; width: 100%; height: 100%; color: var(--accent); -webkit-text-stroke: 0px transparent; clip-path: inset(0 var(--clip-value, 100%) 0 0); }
             .z-char { -webkit-text-stroke: 1px rgba(255, 51, 51, 0.4); }
             .z-char::before { color: var(--z-color); filter: drop-shadow(0 0 10px rgba(255, 51, 51, 0.6)); }
-            .scan-line {
-                position: absolute; top: -20%; bottom: -20%; left: 0; width: 3px; background: #fff;
-                box-shadow: 0 0 20px #fff, 0 0 40px var(--z-color); opacity: 0; z-index: 10;
-            }
+            .scan-line { position: absolute; top: -20%; bottom: -20%; left: 0; width: 3px; background: #fff; box-shadow: 0 0 20px #fff, 0 0 40px var(--z-color); opacity: 0; z-index: 10; }
+            @media (min-width: 768px) { .letter { font-size: 4.5rem; } }
         </style>
         </head>
         <body>
         <div class="wrapper">
             <div class="scan-line" id="scanner"></div>
             <div class="title-js" id="title">
-                <span class="letter" data-char="G">G</span>
-                <span class="letter" data-char="O">O</span>
-                <span class="letter" data-char="K">K</span>
-                <span class="letter" data-char="U">U</span>
-                <span class="letter" data-char="S">S</span>
-                <span class="letter" data-char="E">E</span>
-                <span class="letter" data-char="N">N</span>
-                <span class="letter" data-char="S">S</span>
-                <span class="letter" data-char="E">E</span>
-                <span class="letter" data-char="I">I</span>
-                <span class="letter z-char" data-char="Z">Z</span>
+                <span class="letter" data-char="G">G</span><span class="letter" data-char="O">O</span><span class="letter" data-char="K">K</span><span class="letter" data-char="U">U</span><span class="letter" data-char="S">S</span><span class="letter" data-char="E">E</span><span class="letter" data-char="N">N</span><span class="letter" data-char="S">S</span><span class="letter" data-char="E">E</span><span class="letter" data-char="I">I</span><span class="letter z-char" data-char="Z">Z</span>
             </div>
         </div>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
         <script>
             const tl = anime.timeline();
-            tl.add({ targets: '.letter', opacity: [0, 1], scale: [1.5, 1], rotateY: [-30, 0], filter: ['blur(10px)', 'blur(0px)'], duration: 700, delay: anime.stagger(40), easing: 'easeOutExpo' });
-            tl.add({ targets: '#title', gap: ['15px', '2px'], duration: 800, easing: 'cubicBezier(0.25, 1, 0.5, 1)' }, '-=600');
+            tl.add({ targets: '.letter', opacity: [0, 1], scale: [1.5, 1], duration: 700, delay: anime.stagger(40), easing: 'easeOutExpo' });
+            tl.add({ targets: '#title', gap: ['15px', '2px'], duration: 800 }, '-=600');
+            tl.add({ targets: '.letter', update: (anim) => { document.querySelectorAll('.letter').forEach((el, i) => { el.style.setProperty('--clip-value', (100 - anim.progress) + '%'); }); }, duration: 700 }, '-=800');
+            tl.add({ targets: '#scanner', left: ['-5%', '105%'], opacity: [0, 1, 0], duration: 700 }, '-=700');
             
-            const styleUpdate = document.createElement('style');
-            document.head.appendChild(styleUpdate);
-            anime({
-                targets: styleUpdate, duration: 1500,
-                update: (anim) => {
-                    let cssRules = '';
-                    document.querySelectorAll('.letter').forEach((el, i) => {
-                        const delayFactor = i * 6;
-                        let val = 100 - (anim.progress * 1.4) + delayFactor;
-                        val = Math.min(100, Math.max(0, val));
-                        cssRules += `.letter:nth-child(${i+1})::before { clip-path: inset(0 ${val}% 0 0); }\n`;
-                    });
-                    styleUpdate.innerHTML = cssRules;
-                }
-            });
-
-            tl.add({ targets: '#scanner', left: ['-5%', '105%'], opacity: [0, 1, 1, 0], duration: 700, easing: 'easeInOutQuad' }, '-=700');
-            tl.add({ targets: '.z-char', scale: [1, 1.25, 1], filter: ['brightness(1)', 'brightness(2.2)', 'brightness(1)'], duration: 450, easing: 'easeOutQuad' }, '-=200');
-
             if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js"); }
-            window.onload = () => {
-                setTimeout(() => {
-                    window.location.href = navigator.onLine ? "https://gokusensi.com" : "offline.html";
-                }, 1500);
-            };
+            window.onload = () => { setTimeout(() => { window.location.href = navigator.onLine ? "https://gokusensi.com" : "offline.html"; }, 1500); };
         </script>
         </body>
         </html>
@@ -135,53 +90,32 @@ jobs:
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Signal Perdu | GokuSenseiz</title>
-        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@800&display=swap" rel="stylesheet">
         <style>
-            body { background: #030303; color: white; margin: 0; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Plus Jakarta Sans', sans-serif; }
-            .lost-container { max-width: 400px; text-align: center; background: #000; border: 1px solid rgba(255,255,255,0.1); border-radius: 30px; padding: 40px; }
-            .logo { font-weight: 800; margin-bottom: 20px; font-size: 1.2rem; }
+            body { background: #030303; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
+            .lost-container { max-width: 400px; text-align: center; background: #000; border: 1px solid rgba(255,255,255,0.1); border-radius: 35px; padding: 40px; }
+            .logo { font-size: 1.4rem; font-weight: 800; margin-bottom: 30px; }
             .logo span { color: #555; }
-            .svg-wrapper { width: 150px; margin: 0 auto 20px; animation: float 4s ease-in-out infinite; }
-            @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-            .btn { background: #fff; color: #000; padding: 15px; width: 100%; border-radius: 15px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; }
-            .loading i { animation: spin 1s linear infinite; }
-            @keyframes spin { to { transform: rotate(360deg); } }
+            .btn-reconnect { display: block; width: 100%; background: #111; color: white; padding: 16px; border-radius: 18px; text-decoration: none; font-weight: 800; border: 1px solid rgba(255,255,255,0.1); margin-top: 20px; }
+            .btn-reconnect:hover { background: #fff; color: #00; }
         </style>
         </head>
         <body>
         <div class="lost-container">
             <div class="logo">Goku<span>Senseiz.</span></div>
-            <div class="svg-wrapper">
-                <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="100" cy="80" r="40" stroke="white" stroke-width="2"/>
-                    <path d="M70 80C70 60 130 60 130 80" stroke="white" stroke-width="2"/>
-                    <rect x="70" y="110" width="60" height="40" rx="5" stroke="white" stroke-width="2"/>
-                </svg>
-            </div>
-            <h1>Hors ligne</h1>
-            <p style="color:#666; margin-bottom:30px">La connexion a été interrompue.</p>
-            <button class="btn" id="retryBtn" onclick="retry()">
-                <i class="fa-solid fa-rotate-right"></i> Réessayer
-            </button>
+            <h1 style="font-size:2rem;">Hors ligne</h1>
+            <p style="color:#666;">La connexion avec GokuSenseiz a été interrompue.</p>
+            <a href="index.html" class="btn-reconnect">Réessayer</a>
         </div>
-        <script>
-            function retry() {
-                document.getElementById('retryBtn').classList.add('loading');
-                setTimeout(() => { window.location.href = 'index.html'; }, 1000);
-            }
-        </script>
         </body>
         </html>
         EOF
 
-        # 3. SERVICE WORKER (SW.JS)
+        # 3. SERVICE WORKER
         cat << 'EOF' > sw.js
         const CACHE_NAME = 'goku-v1';
         self.addEventListener('install', e => e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(['offline.html', 'index.html']))));
-        self.addEventListener('fetch', e => {
-            if (e.request.mode === 'navigate') e.respondWith(fetch(e.request).catch(() => caches.match('offline.html')));
-        });
+        self.addEventListener('fetch', e => { if (e.request.mode === 'navigate') e.respondWith(fetch(e.request).catch(() => caches.match('offline.html'))); });
         EOF
 
     - name: Ajouter la plateforme iOS
@@ -192,16 +126,14 @@ jobs:
     - name: Compiler l'application (.app)
       run: |
         cd goku-app/platforms/ios
-        # On force SCHEME_NAME et PROJECT_NAME sur les standards Cordova
+        # Utilisation de iphonesimulator pour éviter les erreurs de signature (Exit Code 65)
         xcodebuild -project "App.xcodeproj" \
           -scheme "App" \
           -configuration Release \
-          -sdk iphoneos \
-          -destination "generic/platform=iOS" \
+          -sdk iphonesimulator \
           -derivedDataPath "build_output" \
           CODE_SIGNING_ALLOWED=NO \
           CODE_SIGNING_REQUIRED=NO \
-          AD_HOC_CODE_SIGNING_ALLOWED=YES \
           clean build
 
     - name: Créer le fichier .IPA
