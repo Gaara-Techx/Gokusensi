@@ -89,10 +89,15 @@ jobs:
     - name: Compiler l'application (.app)
       run: |
         cd goku-app/platforms/ios
+        # On récupère le nom du projet et le premier scheme disponible automatiquement
         PROJECT_NAME=$(ls -d *.xcodeproj | head -n 1)
-        # On utilise 'Generic iOS Device' pour éviter les erreurs de destination
+        SCHEME_NAME=$(xcodebuild -list -project "$PROJECT_NAME" | grep -A 5 "Schemes:" | tail -n 1 | xargs)
+        
+        echo "Projet trouvé : $PROJECT_NAME"
+        echo "Scheme détecté : $SCHEME_NAME"
+
         xcodebuild -project "$PROJECT_NAME" \
-          -scheme "GokuSensei" \
+          -scheme "$SCHEME_NAME" \
           -configuration Release \
           -sdk iphoneos \
           -destination "generic/platform=iOS" \
@@ -105,7 +110,9 @@ jobs:
     - name: Créer le fichier .IPA
       run: |
         mkdir -p ${{ github.workspace }}/ipa/Payload
+        # Recherche récursive du fichier .app dans le dossier de sortie
         APP_PATH=$(find goku-app/platforms/ios/build_output -name "*.app" -type d | head -n 1)
+        echo "App path: $APP_PATH"
         cp -R "$APP_PATH" ${{ github.workspace }}/ipa/Payload/
         cd ${{ github.workspace }}/ipa
         zip -r ${{ github.workspace }}/GokuSensiz.ipa .
