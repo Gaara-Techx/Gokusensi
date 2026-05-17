@@ -1,4 +1,4 @@
-name: Gokusensi Pro Final
+name: Compiler Gokusensi IPA
 
 on:
   workflow_dispatch:
@@ -8,70 +8,80 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout
+      - name: Récupérer le code
         uses: actions/checkout@v4
 
-      - name: Install Cordova
+      - name: Installer Node.js et Cordova
         run: npm install -g cordova
 
-      - name: Build Project
+      - name: Créer le projet iOS Cordova
         run: |
-          # Création du projet
           cordova create goku-app com.gokusensi.shop "GokuSensei"
           cd goku-app
-          cordova platform add ios
           
-          # Téléchargement des ressources
+          # 1. Téléchargement des images (Icone et Splash)
           mkdir -p res/ios
           curl -L -o res/ios/icon.png "https://files.catbox.moe/pukmfj.jpg"
           curl -L -o res/ios/splash.png "https://files.catbox.moe/pukmfj.jpg"
 
-          # Configuration de la détection réseau intelligente
-          # Si navigator.onLine est vrai (WiFi/Data), on va sur le site. Sinon, page offline.
-          cat <<EOF > www/index.html
-          <!DOCTYPE html><html><head><meta charset="UTF-8">
-          <script>
-            function check() {
-              if (navigator.onLine) { window.location.href = "https://gokusensi.com"; }
-              else { window.location.href = "offline.html"; }
-            }
-            window.onload = check;
-          </script></head><body style="background:#000"></body></html>
-          EOF
+          # 2. Création de la page Hors-ligne
+          # On la crée dans www pour qu'elle soit embarquée dans l'IPA
+          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{background:#000;color:white;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;}.card{padding:20px;}h1{color:#00d1ff;}.btn{background:white;color:black;padding:12px 25px;border-radius:15px;text-decoration:none;font-weight:bold;display:inline-block;margin-top:20px;}</style></head><body><div class="card"><h1>Pas de connexion</h1><p>Verifiez votre Wifi ou vos donnees mobiles.</p><a href="index.html" class="btn">Reessayer</a></div></body></html>' > www/offline.html
 
-          # Page Hors-ligne
-          cat <<EOF > www/offline.html
-          <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <style>body{background:#000;color:white;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;}
-          .card{padding:20px;}h1{color:#00d1ff;}.btn{background:white;color:black;padding:12px 25px;border-radius:15px;text-decoration:none;font-weight:bold;display:inline-block;margin-top:20px;}</style></head>
-          <body><div class="card"><h1>Pas de connexion</h1><p>Verifiez votre Wifi ou vos donnees mobiles.</p><a href="index.html" class="btn">Reessayer</a></div></body></html>
-          EOF
-
-          # Injection de la configuration dans le XML
-          # On autorise TOUT pour éviter les blocages iOS
+          # 3. Modification de la config (C'est ici que ton code de base est conservé)
           node -e "
-          const fs = require('fs');
-          let c = fs.readFileSync('config.xml', 'utf8');
-          const ext = '\n  <access origin=\"*\" />\n  <allow-navigation href=\"*\" />\n  <allow-intent href=\"*\" />\n  <platform name=\"ios\">\n    <icon src=\"res/ios/icon.png\" />\n    <splash src=\"res/ios/splash.png\" />\n    <preference name=\"AutoHideSplashScreen\" value=\"true\" />\n    <preference name=\"SplashScreenDelay\" value=\"3000\" />\n  </platform>\n';
-          fs.writeFileSync('config.xml', c.replace('</widget>', ext + '</widget>'));
+            const fs = require('fs');
+            let config = fs.readFileSync('config.xml', 'utf8');
+            
+            // On garde ta redirection de base
+            config = config.replace('src=\"index.html\"', 'src=\"https://gokusensi.com\"');
+            
+            // On ajoute les autorisations et les ressources (Logo/Splash/ErrorUrl)
+            const extra = '  <allow-navigation href=\"https://gokusensi.com/*\" />\n' +
+                          '  <allow-navigation href=\"*\" />\n' +
+                          '  <preference name=\"ErrorUrl\" value=\"offline.html\"/>\n' +
+                          '  <platform name=\"ios\">\n' +
+                          '    <icon src=\"res/ios/icon.png\" />\n' +
+                          '    <splash src=\"res/ios/splash.png\" />\n' +
+                          '    <preference name=\"AutoHideSplashScreen\" value=\"true\" />\n' +
+                          '    <preference name=\"SplashScreenDelay\" value=\"3000\" />\n' +
+                          '  </platform>\n';
+            
+            config = config.replace('</widget>', extra + '</widget>');
+            fs.writeFileSync('config.xml', config);
           "
+          cordova platform add ios
 
-      - name: Xcode Compilation
+      - name: Compiler l'application (.app) avec Xcode Force
         run: |
           cd goku-app/platforms/ios
-          proj=$(ls -d *.xcodeproj | head -n 1)
-          scheme=${proj%.xcodeproj}
-          xcodebuild -project "$proj" -scheme "$scheme" -configuration Release -sdk iphoneos -derivedDataPath "build_output" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO clean build
+          PROJECT_NAME=$(ls -d *.xcodeproj | head -n 1)
+          SCHEME_NAME=${PROJECT_NAME%.xcodeproj}
+          
+          xcodebuild -project "$PROJECT_NAME" \
+                     -scheme "$SCHEME_NAME" \
+                     -configuration Release \
+                     -sdk iphoneos \
+                     -derivedDataPath "build_output" \
+                     CODE_SIGNING_ALLOWED=NO \
+                     CODE_SIGNING_REQUIRED=NO \
+                     clean build
 
-      - name: Create Final IPA
+      - name: Structurer et empaqueter en fichier .IPA
         run: |
-          mkdir -p Payload
-          app=$(find goku-app/platforms/ios/build_output -name "*.app" -type d | head -n 1)
-          cp -R "$app" Payload/
-          zip -r GokuSensei_Final.ipa Payload
+          mkdir -p ${{ github.workspace }}/ipa/Payload
+          APP_PATH=$(find goku-app/platforms/ios/build_output -name "*.app" -type d | head -n 1)
+          echo "Application trouvée ici : $APP_PATH"
+          if [ -z "$APP_PATH" ]; then
+            echo "ERREUR : Le build a échoué à produire un .app"
+            exit 1
+          fi
+          cp -R "$APP_PATH" ${{ github.workspace }}/ipa/Payload/
+          cd ${{ github.workspace }}/ipa
+          zip -r ${{ github.workspace }}/GokuSensiz.ipa .
 
-      - name: Upload IPA
+      - name: Mettre à disposition le fichier IPA
         uses: actions/upload-artifact@v4
         with:
-          name: GokuSensei-Production
-          path: GokuSensei_Final.ipa
+          name: GokuSensiz-App-iOS
+          path: ${{ github.workspace }}/GokuSensiz.ipa
