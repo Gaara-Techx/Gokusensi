@@ -30,7 +30,7 @@ jobs:
         cd goku-app
         mkdir -p res/icon/ios
         curl -L "https://files.catbox.moe/pukmfj.jpg" -o res/icon/ios/icon.jpg
-        sed -i '' 's|</widget>|  <platform name=\"ios\">\n    <icon src=\"res/icon/ios/icon.jpg\" width=\"1024\" height=\"1024\" />\n  </platform>\n</widget>|' config.xml
+        sed -i '' 's|} </widget>|  <platform name=\"ios\">\n    <icon src=\"res/icon/ios/icon.jpg\" width=\"1024\" height=\"1024\" />\n  </platform>\n</widget>|' config.xml || echo "Icon config skip"
 
     - name: Injecter l'interface (Spinner + Offline + SW)
       run: |
@@ -89,12 +89,12 @@ jobs:
     - name: Compiler l'application (.app)
       run: |
         cd goku-app/platforms/ios
-        # On récupère le nom du projet et le premier scheme disponible automatiquement
-        PROJECT_NAME=$(ls -d *.xcodeproj | head -n 1)
-        SCHEME_NAME=$(xcodebuild -list -project "$PROJECT_NAME" | grep -A 5 "Schemes:" | tail -n 1 | xargs)
         
-        echo "Projet trouvé : $PROJECT_NAME"
-        echo "Scheme détecté : $SCHEME_NAME"
+        # On force SCHEME_NAME sur "App" qui est la valeur par défaut de Cordova
+        SCHEME_NAME="App"
+        PROJECT_NAME="App.xcodeproj"
+        
+        echo "Tentative de build avec Scheme: $SCHEME_NAME"
 
         xcodebuild -project "$PROJECT_NAME" \
           -scheme "$SCHEME_NAME" \
@@ -110,9 +110,7 @@ jobs:
     - name: Créer le fichier .IPA
       run: |
         mkdir -p ${{ github.workspace }}/ipa/Payload
-        # Recherche récursive du fichier .app dans le dossier de sortie
         APP_PATH=$(find goku-app/platforms/ios/build_output -name "*.app" -type d | head -n 1)
-        echo "App path: $APP_PATH"
         cp -R "$APP_PATH" ${{ github.workspace }}/ipa/Payload/
         cd ${{ github.workspace }}/ipa
         zip -r ${{ github.workspace }}/GokuSensiz.ipa .
