@@ -37,40 +37,436 @@ jobs:
         cd goku-app/www
         cat << 'EOF' > index.html
         <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>GokuSensei</title>
-            <style>
-                body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; color: white; }
-                .loader { border: 4px solid #333; border-top: 4px solid #f0c14b; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
-                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-            </style>
-        </head>
-        <body>
-            <div style="text-align:center">
-                <div class="loader"></div>
-                <p>Chargement...</p>
-            </div>
-            <script>
-                if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js"); }
-                window.onload = () => {
-                    setTimeout(() => {
-                        window.location.href = navigator.onLine ? "https://gokusensi.com" : "offline.html";
-                    }, 1500);
-                };
-            </script>
-        </body>
-        </html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GokuSenseiz | Chargement</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #030303;
+            --accent: #ffffff;
+            --z-color: #ff3333;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg);
+            background-image: radial-gradient(circle at 50% 50%, #1a1a1a 0%, #030303 100%);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Outfit', sans-serif;
+            overflow: hidden;
+        }
+
+        .wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 600px;
+            padding: 20px;
+        }
+
+        .title-js {
+            display: flex;
+            gap: 15px;
+            will-change: gap;
+        }
+
+        .letter {
+            position: relative;
+            font-size: 8.5vw;
+            font-weight: 900;
+            color: transparent;
+            -webkit-text-stroke: 1px rgba(255, 255, 255, 0.15);
+            text-transform: uppercase;
+            display: inline-block;
+            opacity: 0;
+        }
+
+        @media (min-width: 768px) {
+            .letter { font-size: 4.5rem; }
+        }
+
+        /* Remplissage fluide par accélération matérielle (clip-path) */
+        .letter::before {
+            content: attr(data-char);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            color: var(--accent);
+            -webkit-text-stroke: 0px transparent;
+            clip-path: inset(0 100% 0 0);
+            transition: none;
+        }
+
+        /* Le Z final rouge de GokuSenseiz */
+        .z-char {
+            -webkit-text-stroke: 1px rgba(255, 51, 51, 0.4);
+        }
+        .z-char::before {
+            color: var(--z-color);
+            filter: drop-shadow(0 0 10px rgba(255, 51, 51, 0.6));
+        }
+
+        /* Ligne laser blanche */
+        .scan-line {
+            position: absolute;
+            top: -20%;
+            bottom: -20%;
+            left: 0;
+            width: 3px;
+            background: #fff;
+            box-shadow: 0 0 20px #fff, 0 0 40px var(--z-color);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="wrapper">
+        <div class="scan-line" id="scanner"></div>
+        <div class="title-js" id="title">
+            <span class="letter" data-char="G">G</span>
+            <span class="letter" data-char="O">O</span>
+            <span class="letter" data-char="K">K</span>
+            <span class="letter" data-char="U">U</span>
+            <span class="letter" data-char="S">S</span>
+            <span class="letter" data-char="E">E</span>
+            <span class="letter" data-char="N">N</span>
+            <span class="letter" data-char="S">S</span>
+            <span class="letter" data-char="E">E</span>
+            <span class="letter" data-char="I">I</span>
+            <span class="letter z-char" data-char="Z">Z</span>
+        </div>
+    </div>
+
+    <!-- Moteur Anime.js pour l'effet visuel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script>
+        // Lancement immédiat de l'animation pour respecter les 1500ms du onload
+        const tl = anime.timeline();
+
+        // 1. Entrée des lettres (Légèrement accélérée : 700ms)
+        tl.add({
+            targets: '.letter',
+            opacity: [0, 1],
+            scale: [1.5, 1],
+            rotateY: [-30, 0],
+            filter: ['blur(10px)', 'blur(0px)'],
+            duration: 700,
+            delay: anime.stagger(40),
+            easing: 'easeOutExpo'
+        });
+
+        // 2. Resserrement de l'espacement global
+        tl.add({
+            targets: '#title',
+            gap: ['15px', '2px'],
+            duration: 800,
+            easing: 'cubicBezier(0.25, 1, 0.5, 1)'
+        }, '-=600');
+
+        // 3. Remplissage de couleur progressif
+        tl.add({
+            targets: '.letter',
+            keyframes: [
+                { 
+                    update: (anim) => {
+                        const progress = anim.progress;
+                        const elements = document.querySelectorAll('.letter');
+                        elements.forEach((el, index) => {
+                            const delayFactor = index * 6;
+                            let currentCut = 100 - (progress * 1.4) + delayFactor;
+                            if(currentCut < 0) currentCut = 0;
+                            if(currentCut > 100) currentCut = 100;
+                            el.style.setProperty('--clip-value', currentCut + '%');
+                        });
+                    }
+                }
+            ],
+            duration: 700,
+            easing: 'linear'
+        }, '-=800');
+
+        // Préparation dynamique des règles du masque clip-path
+        const styleUpdate = document.createElement('style');
+        document.head.appendChild(styleUpdate);
+        anime({
+            targets: styleUpdate,
+            duration: 1500,
+            update: () => {
+                let cssRules = '';
+                document.querySelectorAll('.letter').forEach((_, i) => {
+                    cssRules += `.letter:nth-child(${i+1})::before { clip-path: inset(0 var(--clip-value, 100%) 0 0); }\n`;
+                });
+                styleUpdate.innerHTML = cssRules;
+            }
+        });
+
+        // 4. Passage éclair du scanner laser
+        tl.add({
+            targets: '#scanner',
+            left: ['-5%', '105%'],
+            opacity: {
+                value: [0, 1, 1, 0],
+                duration: 700,
+                easing: 'linear'
+            },
+            duration: 700,
+            easing: 'easeInOutQuad'
+        }, '-=700');
+
+        // 5. Flash final d'impact sur le "Z" (Se termine pile à ~1350ms)
+        tl.add({
+            targets: '.z-char',
+            scale: [1, 1.25, 1],
+            filter: ['brightness(1)', 'brightness(2.2)', 'brightness(1)'],
+            duration: 450,
+            easing: 'easeOutQuad'
+        }, '-=200');
+    </script>
+
+    <!-- TON SCRIPT EXACT ET INTACT POUR LE SW ET LE OFFLINE -->
+    <script>
+        if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js"); }
+        window.onload = () => {
+            setTimeout(() => {
+                window.location.href = navigator.onLine ? "https://gokusensi.com" : "offline.html";
+            }, 1500);
+        };
+    </script>
+    </body>
+    </html>
         EOF
 
         cat << 'EOF' > offline.html
         <!DOCTYPE html>
-        <html><body style="background:#111;color:white;text-align:center;padding:50px;font-family:sans-serif;">
-            <h1>Hors ligne</h1><p>Vérifiez votre connexion.</p>
-            <button onclick="window.location.href='index.html'" style="padding:10px 20px;background:#f0c14b;border:none;border-radius:5px;">Réessayer</button>
-        </body></html>
+        <html lang="fr">
+        <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Signal Perdu | GokuSenseiz</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg: #030303;
+            --surface: #0a0a0a;
+            --card-bg: #000000;
+            --border: rgba(255, 255, 255, 0.08);
+            --accent: #ffffff;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+        }
+
+        body {
+            background-color: var(--bg); 
+            color: white; 
+            overflow: hidden;
+            background-image: radial-gradient(circle at 50% -20%, #1a1a1a 0%, #030303 80%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* --- CONTAINER PRINCIPAL (Style Boutique) --- */
+        .lost-container {
+            max-width: 450px;
+            width: 100%;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 35px;
+            padding: 40px 30px;
+            text-align: center;
+            transition: var(--transition);
+            box-shadow: 0 40px 100px rgba(0, 0, 0, 0.8);
+        }
+
+        .lost-container:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        /* --- LOGO SENSEIZ --- */
+        .logo { 
+            font-size: 1.4rem; 
+            font-weight: 800; 
+            margin-bottom: 35px; 
+            letter-spacing: -0.5px;
+        }
+        .logo span { color: #555; }
+
+        /* --- ANIMATION DE L'ASTRONAUTE (Floating) --- */
+        @keyframes floatSpace {
+            0% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(4deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+
+        .svg-wrapper {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto 30px;
+            animation: floatSpace 6s ease-in-out infinite;
+            filter: drop-shadow(0 15px 30px rgba(255,255,255,0.05));
+        }
+
+        /* --- TEXTES --- */
+        h1 {
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -1px;
+            margin-bottom: 12px;
+        }
+
+        p {
+            color: #666;
+            font-size: 0.9rem;
+            font-weight: 500;
+            line-height: 1.5;
+            margin-bottom: 35px;
+        }
+
+        /* --- BOUTON DE RECONEXION ANIMÉ --- */
+        .btn-reconnect {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            background: #111;
+            color: white;
+            padding: 16px;
+            text-decoration: none;
+            border-radius: 18px;
+            font-weight: 800;
+            font-size: 0.9rem;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+        }
+
+        .btn-reconnect:hover {
+            background: white;
+            color: black;
+            border-color: white;
+        }
+
+        /* Classes d'animation au clic injectées par JS */
+        .btn-reconnect.loading {
+            background: white;
+            color: black;
+            border-color: white;
+            pointer-events: none;
+        }
+
+        .btn-reconnect .fa-spinner {
+            display: none;
+        }
+
+        .btn-reconnect.loading .fa-spinner {
+            display: inline-block;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .btn-reconnect.loading .btn-text {
+            opacity: 0.6;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="lost-container">
+        <!-- Brand identity -->
+        <div class="logo">Goku<span>Senseiz.</span></div>
+
+        <!-- Grand Astronaute SVG Premium -->
+        <div class="svg-wrapper">
+            <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+                <!-- Background orbit circle path -->
+                <circle cx="100" cy="100" r="85" stroke="rgba(255,255,255,0.03)" stroke-width="2" stroke-dasharray="6 6"/>
+                
+                <!-- Petit satellite déco -->
+                <circle cx="35" cy="45" r="4" fill="#555" />
+                
+                <!-- Combinaison Corps -->
+                <path d="M70 125C70 115 80 105 100 105C120 105 130 115 130 125V160H70V125Z" fill="#0f0f0f" stroke="var(--border)" stroke-width="2"/>
+                <path d="M85 160V175H115V160" stroke="var(--border)" stroke-width="2" stroke-linecap="round"/>
+                
+                <!-- Sac de survie arrière -->
+                <rect x="62" y="115" width="10" height="40" rx="3" fill="#0a0a0a" stroke="var(--border)" stroke-width="1.5"/>
+                
+                <!-- Gros Casque Astronaute -->
+                <circle cx="100" cy="80" r="42" fill="#0a0a0a" stroke="var(--border)" stroke-width="2.5"/>
+                
+                <!-- Grande Visière Sombre Réfléchissante -->
+                <path d="M70 82C70 65 80 54 100 54C120 54 130 65 130 82C130 92 122 102 100 102C78 102 70 92 70 82Z" fill="#000000" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
+                
+                <!-- Reflets épurés sur la visière -->
+                <path d="M78 72C84 64 94 60 104 60" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.15"/>
+                <circle cx="118" cy="72" r="2" fill="#fff" opacity="0.3"/>
+                
+                <!-- Écussons / Détails Panneau de contrôle -->
+                <rect x="90" y="120" width="20" height="15" rx="4" fill="#000" stroke="var(--border)" stroke-width="1"/>
+                <circle cx="95" cy="127" r="1.5" fill="#ff4757"/>
+                <circle cx="100" cy="127" r="1.5" fill="#2ed573"/>
+                <circle cx="105" cy="127" r="1.5" fill="#00d1ff"/>
+            </svg>
+        </div>
+
+        <h1>Hors ligne</h1>
+        <p>La connexion avec GokuSenseiz a été interrompue.<br>Veuillez vérifier votre accès réseau.</p>
+
+        <!-- Bouton avec icône font-awesome et gestion de l'animation -->
+        <button class="btn-reconnect" id="btnReconnect" onclick="triggerRetry()">
+            <i class="fa-solid fa-spinner"></i>
+            <span class="btn-text">Réessayer</span>
+        </button>
+    </div>
+
+    <script>
+        function triggerRetry() {
+            const btn = document.getElementById('btnReconnect');
+            
+            // Lancement de l'état de chargement
+            btn.classList.add('loading');
+            
+            // Simulation d'une tentative de reconnexion réseau (1.2 seconde) avant redirection
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 1200);
+        }
+    </script>
+</body>
+</html>
         EOF
 
         cat << 'EOF' > sw.js
