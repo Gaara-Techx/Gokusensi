@@ -8,85 +8,121 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Récupérer le code
-        uses: actions/checkout@v4
+    - name: Récupérer le code
+      uses: actions/checkout@v4
 
-      - name: Installer Node.js et Cordova
-        run: npm install -g cordova
+    - name: Installer Node.js et Cordova
+      run: npm install -g cordova
 
-      - name: Créer le projet iOS Cordova
-        run: |
-          # 1. Création initiale
-          cordova create goku-app com.gokusensi.shop "GokuSensei"
-          cd goku-app
-          
-          # 2. Préparation des ressources (Icone et Splash)
-          mkdir -p res/ios
-          curl -L -o res/ios/icon.png "https://files.catbox.moe/pukmfj.jpg"
-          curl -L -o res/ios/splash.png "https://files.catbox.moe/pukmfj.jpg"
+    - name: Créer le projet iOS Cordova
+      run: |
+        cordova create goku-app com.gokusensi.shop "GokuSensei"
+        cd goku-app
+        node -e "
+          const fs = require('fs');
+          let config = fs.readFileSync('config.xml', 'utf8');
+          config = config.replace('src=\"index.html\"', 'src=\"https://gokusensi.com\"');
+          config = config.replace('</widget>', '  <allow-navigation href=\"https://gokusensi.com/*\" />\n</widget>');
+          fs.writeFileSync('config.xml', config);
+        "
 
-          # 3. Page Offline & Détection Réseau (Wi-Fi/Données Mobiles)
-          # On remplace l'index par un script de vérification
-          echo '<!DOCTYPE html><html><head><script>function check(){if(navigator.onLine){window.location.href="https://gokusensi.com";}else{window.location.href="offline.html";}}window.onload=check;</script></head><body style="background:#000"></body></html>' > www/index.html
-          
-          # Page d'erreur personnalisée
-          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{background:#000;color:white;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;}.card{padding:20px;}h1{color:#00d1ff;}.btn{background:white;color:black;padding:12px 25px;border-radius:15px;text-decoration:none;font-weight:bold;display:inline-block;margin-top:20px;}</style></head><body><div class="card"><h1>Pas de connexion</h1><p>Verifiez votre Wifi ou vos donnees mobiles.</p><a href="index.html" class="btn">Reessayer</a></div></body></html>' > www/offline.html
+    - name: Injecter le système Offline (Service Worker)
+      run: |
+        cd goku-app/www
+        
+        # 1. Création de la page offline.html locale dans l'app
+        cat << 'EOF' > offline.html
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Hors ligne</title>
+            <style>
+                body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f4f4f9; color: #333; }
+                h1 { color: #dd4b39; }
+                p { font-size: 18px; }
+                button { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+            </style>
+        </head>
+        <body>
+            <h1>Oops ! Vous êtes hors ligne</h1>
+            <p>L'application GokuSensei nécessite une connexion internet.</p>
+            <button onclick="window.location.reload()">Réessayer</button>
+        </body>
+        </html>
+        EOF
 
-          # 4. Configuration XML (L'ordre est crucial ici)
-          node -e "
-            const fs = require('fs');
-            let config = fs.readFileSync('config.xml', 'utf8');
-            
-            // On ajoute les autorisations et les balises de ressources
-            const extra = '  <access origin=\"*\" />\n' +
-                          '  <allow-navigation href=\"*\" />\n' +
-                          '  <allow-intent href=\"*\" />\n' +
-                          '  <preference name=\"ErrorUrl\" value=\"offline.html\"/>\n' +
-                          '  <platform name=\"ios\">\n' +
-                          '    <icon src=\"res/ios/icon.png\" />\n' +
-                          '    <splash src=\"res/ios/splash.png\" />\n' +
-                          '    <preference name=\"AutoHideSplashScreen\" value=\"true\" />\n' +
-                          '    <preference name=\"SplashScreenDelay\" value=\"3000\" />\n' +
-                          '  </platform>\n';
-            
-            config = config.replace('</widget>', extra + '</widget>');
-            fs.writeFileSync('config.xml', config);
-          "
-          
-          # 5. Ajout de la plateforme APRES la config pour que Cordova lie les ressources
-          cordova platform add ios
+        # 2. Création du fichier sw.js local dans l'app
+        cat << 'EOF' > sw.js
+        const CACHE_NAME = 'goku-offline-v1';
+        const OFFLINE_URL = '/offline.html';
 
-      - name: Compiler l'application (.app) avec Xcode Force
-        run: |
-          cd goku-app/platforms/ios
-          PROJECT_NAME=$(ls -d *.xcodeproj | head -n 1)
-          SCHEME_NAME=${PROJECT_NAME%.xcodeproj}
-          
-          xcodebuild -project "$PROJECT_NAME" \
-                     -scheme "$SCHEME_NAME" \
-                     -configuration Release \
-                     -sdk iphoneos \
-                     -derivedDataPath "build_output" \
-                     CODE_SIGNING_ALLOWED=NO \
-                     CODE_SIGNING_REQUIRED=NO \
-                     clean build
+        self.addEventListener('install', (event) => {
+            event.waitUntil(
+                caches.open(CACHE_NAME).then((cache) => {
+                    return cache.add(new Request(OFFLINE_URL, { cache: 'reload' }));
+                })
+            );
+            self.skipWaiting();
+        });
 
-      - name: Structurer et empaqueter en fichier .IPA
-        run: |
-          mkdir -p ${{ github.workspace }}/ipa/Payload
-          APP_PATH=$(find goku-app/platforms/ios/build_output -name "*.app" -type d | head -n 1)
-          
-          if [ -z "$APP_PATH" ]; then
-            echo "ERREUR : Impossible de trouver le fichier .app"
-            exit 1
-          fi
-          
-          cp -R "$APP_PATH" ${{ github.workspace }}/ipa/Payload/
-          cd ${{ github.workspace }}/ipa
-          zip -r ${{ github.workspace }}/GokuSensiz.ipa .
+        self.addEventListener('activate', (event) => {
+            event.waitUntil(self.clients.claim());
+        });
 
-      - name: Mettre à disposition le fichier IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: GokuSensiz-App-iOS
-          path: ${{ github.workspace }}/GokuSensiz.ipa
+        self.addEventListener('fetch', (event) => {
+            if (event.request.mode === 'navigate') {
+                event.respondWith(
+                    fetch(event.request).catch(() => {
+                        return caches.open(CACHE_NAME).then((cache) => {
+                            return cache.match(OFFLINE_URL);
+                        });
+                    })
+                );
+            }
+        });
+        EOF
+
+        # 3. Enregistrement du Service Worker dans le index.html de base de Cordova
+        # (Au cas où le site ne charge pas du tout au premier démarrage)
+        sed -i '' 's|</body>|<script>if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("/sw.js");});}</script></body>|' index.html
+
+    - name: Ajouter la plateforme iOS
+      run: |
+        cd goku-app
+        cordova platform add ios
+
+    - name: Compiler l'application (.app) avec Xcode Force
+      run: |
+        cd goku-app/platforms/ios
+        PROJECT_NAME=$(ls -d *.xcodeproj | head -n 1)
+        SCHEME_NAME=${PROJECT_NAME%.xcodeproj}
+        
+        xcodebuild -project "$PROJECT_NAME" \
+          -scheme "$SCHEME_NAME" \
+          -configuration Release \
+          -sdk iphoneos \
+          -derivedDataPath "build_output" \
+          CODE_SIGNING_ALLOWED=NO \
+          CODE_SIGNING_REQUIRED=NO \
+          clean build
+
+    - name: Structurer et empaqueter en fichier .IPA
+      run: |
+        mkdir -p ${{ github.workspace }}/ipa/Payload
+        APP_PATH=$(find goku-app/platforms/ios/build_output -name "*.app" -type d | head -n 1)
+        echo "Application trouvée ici : $APP_PATH"
+        if [ -z "$APP_PATH" ]; then
+          echo "ERREUR : Le build a échoué à produire un .app"
+          exit 1
+        fi
+        cp -R "$APP_PATH" ${{ github.workspace }}/ipa/Payload/
+        cd ${{ github.workspace }}/ipa
+        zip -r ${{ github.workspace }}/GokuSensiz.ipa .
+
+    - name: Mettre à disposition le fichier IPA
+      uses: actions/upload-artifact@v4
+      with:
+        name: GokuSensiz-App-iOS
+        path: ${{ github.workspace }}/GokuSensiz.ipa
