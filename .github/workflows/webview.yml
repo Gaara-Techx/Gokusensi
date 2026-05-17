@@ -18,111 +18,127 @@ jobs:
       run: |
         cordova create goku-app com.gokusensi.shop "GokuSensei"
         cd goku-app
+        # On autorise la navigation vers ton domaine
         node -e "
           const fs = require('fs');
           let config = fs.readFileSync('config.xml', 'utf8');
-          config = config.replace('src=\"index.html\"', 'src=\"https://gokusensi.com\"');
           config = config.replace('</widget>', '  <allow-navigation href=\"https://gokusensi.com/*\" />\n</widget>');
           fs.writeFileSync('config.xml', config);
         "
 
-    - name: Injecter le système Offline (Service Worker)
+    - name: Configurer l'Icône de l'application
+      run: |
+        cd goku-app
+        mkdir -p res/icon/ios
+        # Téléchargement de ton image depuis Catbox
+        curl -L "https://files.catbox.moe/pukmfj.jpg" -o res/icon/ios/icon.jpg
+        # Ajout de la configuration de l'icône dans le config.xml
+        sed -i '' 's|</widget>|  <platform name=\"ios\">\n    <icon src=\"res/icon/ios/icon.jpg\" width=\"1024\" height=\"1024\" />\n  </platform>\n</widget>|' config.xml
+
+    - name: Injecter l'interface (Spinner + Offline + SW)
       run: |
         cd goku-app/www
         
-        # 1. Création de la page offline.html locale dans l'app
+        # 1. Page de démarrage index.html avec SPINNER
+        cat << 'EOF' > index.html
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>GokuSensei</title>
+            <style>
+                body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; color: white; }
+                .loader { border: 4px solid #333; border-top: 4px solid #f0c14b; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                .container { text-align: center; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="loader"></div>
+                <p>Chargement de GokuSensei...</p>
+            </div>
+            <script>
+                async function initApp() {
+                    // Enregistrement du Service Worker
+                    if ("serviceWorker" in navigator) {
+                        try { await navigator.serviceWorker.register("sw.js"); } catch(e) {}
+                    }
+                    
+                    // Vérification de la connexion après un petit délai pour le look
+                    setTimeout(() => {
+                        if (navigator.onLine) {
+                            window.location.href = "https://gokusensi.com";
+                        } else {
+                            window.location.href = "offline.html";
+                        }
+                    }, 1500);
+                }
+                window.onload = initApp;
+            </script>
+        </body>
+        </html>
+        EOF
+
+        # 2. Page Offline améliorée
         cat << 'EOF' > offline.html
         <!DOCTYPE html>
-        <html lang="fr">
+        <html>
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Hors ligne</title>
             <style>
-                body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f4f4f9; color: #333; }
-                h1 { color: #dd4b39; }
-                p { font-size: 18px; }
-                button { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+                body { background: #111; color: white; text-align: center; padding: 50px; font-family: sans-serif; }
+                .btn { padding: 15px 30px; background: #f0c14b; border: none; border-radius: 8px; color: black; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; margin-top: 20px; }
             </style>
         </head>
         <body>
-            <h1>Oops ! Vous êtes hors ligne</h1>
-            <p>L'application GokuSensei nécessite une connexion internet.</p>
-            <button onclick="window.location.reload()">Réessayer</button>
+            <h1>Pas de connexion</h1>
+            <p>Désolé, GokuSensei a besoin d'internet pour fonctionner.</p>
+            <a href="index.html" class="btn">RÉESSAYER</a>
         </body>
         </html>
         EOF
 
-        # 2. Création du fichier sw.js local dans l'app
+        # 3. Service Worker sw.js
         cat << 'EOF' > sw.js
-        const CACHE_NAME = 'goku-offline-v1';
-        const OFFLINE_URL = '/offline.html';
-
-        self.addEventListener('install', (event) => {
-            event.waitUntil(
-                caches.open(CACHE_NAME).then((cache) => {
-                    return cache.add(new Request(OFFLINE_URL, { cache: 'reload' }));
-                })
-            );
+        const CACHE_NAME = 'goku-v1';
+        const FILES = ['offline.html', 'index.html'];
+        self.addEventListener('install', (e) => {
+            e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(FILES)));
             self.skipWaiting();
         });
-
-        self.addEventListener('activate', (event) => {
-            event.waitUntil(self.clients.claim());
-        });
-
-        self.addEventListener('fetch', (event) => {
-            if (event.request.mode === 'navigate') {
-                event.respondWith(
-                    fetch(event.request).catch(() => {
-                        return caches.open(CACHE_NAME).then((cache) => {
-                            return cache.match(OFFLINE_URL);
-                        });
-                    })
-                );
+        self.addEventListener('fetch', (e) => {
+            if (e.request.mode === 'navigate') {
+                e.respondWith(fetch(e.request).catch(() => caches.match('offline.html')));
             }
         });
         EOF
-
-        # 3. Enregistrement du Service Worker dans le index.html de base de Cordova
-        # (Au cas où le site ne charge pas du tout au premier démarrage)
-        sed -i '' 's|</body>|<script>if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("/sw.js");});}</script></body>|' index.html
 
     - name: Ajouter la plateforme iOS
       run: |
         cd goku-app
         cordova platform add ios
 
-    - name: Compiler l'application (.app) avec Xcode Force
+    - name: Compiler l'application (.app)
       run: |
         cd goku-app/platforms/ios
         PROJECT_NAME=$(ls -d *.xcodeproj | head -n 1)
         SCHEME_NAME=${PROJECT_NAME%.xcodeproj}
-        
-        xcodebuild -project "$PROJECT_NAME" \
-          -scheme "$SCHEME_NAME" \
-          -configuration Release \
-          -sdk iphoneos \
-          -derivedDataPath "build_output" \
-          CODE_SIGNING_ALLOWED=NO \
-          CODE_SIGNING_REQUIRED=NO \
-          clean build
+        xcodebuild -project "$PROJECT_NAME" -scheme "$SCHEME_NAME" -configuration Release -sdk iphoneos -derivedDataPath "build_output" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO clean build
 
-    - name: Structurer et empaqueter en fichier .IPA
+    - name: Créer le fichier .IPA
       run: |
         mkdir -p ${{ github.workspace }}/ipa/Payload
         APP_PATH=$(find goku-app/platforms/ios/build_output -name "*.app" -type d | head -n 1)
-        echo "Application trouvée ici : $APP_PATH"
-        if [ -z "$APP_PATH" ]; then
-          echo "ERREUR : Le build a échoué à produire un .app"
-          exit 1
-        fi
         cp -R "$APP_PATH" ${{ github.workspace }}/ipa/Payload/
         cd ${{ github.workspace }}/ipa
         zip -r ${{ github.workspace }}/GokuSensiz.ipa .
 
-    - name: Mettre à disposition le fichier IPA
+    - name: Télécharger l'IPA
       uses: actions/upload-artifact@v4
       with:
-        name: GokuSensiz-App-iOS
+        name: GokuSensiz-IPA
         path: ${{ github.workspace }}/GokuSensiz.ipa
